@@ -74,7 +74,7 @@ touch ~/summary.log
 
 # Convert eol
 dos2unix utils.sh
-
+dos2unix perf_utils.sh
 # Source utils.sh
 . utils.sh || {
     echo "Error: unable to source utils.sh!"
@@ -82,8 +82,21 @@ dos2unix utils.sh
     exit 2
 }
 
+. perf_utils.sh || {
+    echo "Error: unable to source perf_utils.sh!"
+    echo "TestAborted" > state.txt
+    exit 2
+}
 # Source constants file and initialize most common variables
 UtilsInit
+
+#Apling performance parameters
+setup_sysctl
+if [ $? -ne 0 ]; then
+    echo "Unable to add performance parameters."
+    LogMsg "Unable to add performance parameters."
+    UpdateTestState $ICA_TESTABORTED
+fi
 
 # In case of error
 case $? in
@@ -128,7 +141,8 @@ function get_tx_bytes(){
     then
         #TX packets 223558709  bytes 15463202847 (14.4 GiB)
         Tx_bytes=`ifconfig $ETH_NAME| grep "TX packets"| awk '{print $5}'`
-    fi    
+    fi
+    echo $Tx_bytes 
 }
 
 function get_tx_pkts(){
@@ -139,7 +153,8 @@ function get_tx_pkts(){
     then
         #TX packets 223558709  bytes 15463202847 (14.4 GiB)
         Tx_pkts=`ifconfig $ETH_NAME| grep "TX packets"| awk '{print $3}'`
-    fi    
+    fi 
+    echo $Tx_pkts
 }
 
 #Create log folder
@@ -287,7 +302,7 @@ if [[ $? -eq 0 ]]; then
         exit 60
     fi
 else
-    ipVersion=$null
+    ipVersion=
 fi
 
 #
@@ -526,6 +541,7 @@ if [ $? -ne 0 ]; then
 fi
 scp -i $HOME/.ssh/$SSH_PRIVATE_KEY -v -o StrictHostKeyChecking=no ~/constants.sh ${SERVER_OS_USERNAME}@[${STATIC_IP2}]:
 scp -i $HOME/.ssh/$SSH_PRIVATE_KEY -v -o StrictHostKeyChecking=no ~/utils.sh ${SERVER_OS_USERNAME}@[${STATIC_IP2}]:
+scp -i $HOME/.ssh/$SSH_PRIVATE_KEY -v -o StrictHostKeyChecking=no ~/perf_utils.sh ${SERVER_OS_USERNAME}@[${STATIC_IP2}]:
 
 #
 # Start ntttcp in server mode on the Target server side
@@ -596,13 +612,13 @@ do
     echo "======================================"
     
     ssh -i $HOME/.ssh/${SSH_PRIVATE_KEY} -v -o StrictHostKeyChecking=no ${SERVER_OS_USERNAME}@${SERVER_IP} "pkill -f ntttcp"
-    ssh -i $HOME/.ssh/${SSH_PRIVATE_KEY} -v -o StrictHostKeyChecking=no ${SERVER_OS_USERNAME}@${SERVER_IP} "ntttcp -r${SERVER_IP} -P $num_threads_P -t ${TEST_DURATION}" &
+    ssh -i $HOME/.ssh/${SSH_PRIVATE_KEY} -v -o StrictHostKeyChecking=no ${SERVER_OS_USERNAME}@${SERVER_IP} "ntttcp -r${SERVER_IP} -P $num_threads_P -t ${TEST_DURATION} ${ipVersion}" &
 
     ssh -i $HOME/.ssh/${SSH_PRIVATE_KEY} -v -o StrictHostKeyChecking=no ${SERVER_OS_USERNAME}@${SERVER_IP} "pkill -f lagscope"
-    ssh -i $HOME/.ssh/${SSH_PRIVATE_KEY} -v -o StrictHostKeyChecking=no ${SERVER_OS_USERNAME}@${SERVER_IP} "lagscope -r${SERVER_IP}" &
+    ssh -i $HOME/.ssh/${SSH_PRIVATE_KEY} -v -o StrictHostKeyChecking=no ${SERVER_OS_USERNAME}@${SERVER_IP} "lagscope -r${SERVER_IP} ${ipVersion}" &
     
     sleep 2
-    lagscope -s${SERVER_IP} -t ${TEST_DURATION} -V  > "./$log_folder/lagscope-ntttcp-p${num_threads_P}X${num_threads_n}.log" &
+    lagscope -s${SERVER_IP} -t ${TEST_DURATION} -V ${ipVersion} > "./$log_folder/lagscope-ntttcp-p${num_threads_P}X${num_threads_n}.log" &
     ntttcp -s${SERVER_IP} -P $num_threads_P -n $num_threads_n -t ${TEST_DURATION} ${ipVersion} > "./$log_folder/ntttcp-p${num_threads_P}X${num_threads_n}.log"
 
     current_tx_bytes=$(get_tx_bytes)
@@ -628,7 +644,7 @@ if [ $sts -eq 0 ]; then
     echo "Ntttcp succeeded with all connections." >> ~/summary.log
     cd $HOME
     zip -r $log_folder.zip . -i $log_folder/*
-    sleep 20
+    sleep 10
     UpdateTestState $ICA_TESTCOMPLETED
 else 
     LogMsg "Something gone wrong. Please re-run.."
