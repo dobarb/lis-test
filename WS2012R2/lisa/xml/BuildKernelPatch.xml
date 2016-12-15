@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<config>
+	<global>
+		<defaultSnapshot>ICABase</defaultSnapshot>
+		<LisaInitScript>
+			<file>.\setupScripts\CreateVMs.ps1</file>
+		</LisaInitScript>
+		<logfileRootDir>\\redmond\wsscfs\OSTC\LIS\TestLog\Linux-Next_Build</logfileRootDir>
+		<imageStoreDir>\\redmond\wsscfs\OSTC\LIS\VHDStore\base</imageStoreDir>
+		<email>
+			<recipients>
+				<to>v-dobarb@microsoft.com</to>   
+			</recipients>
+			<sender>av-dobarb@microsoft.com</sender>
+			<subject>Linux-Next Build</subject>
+			<smtpServer>smtphost.redmond.corp.microsoft.com</smtpServer>
+		</email>
+	</global>  
+
+	<testSuites>
+		<suite>
+			<suiteName>Upstream</suiteName>
+			<suiteTests>
+				<!-- Setup and building kernel with patches -->
+				<suiteTest>BuildKernelOnline</suiteTest>
+				<suiteTest>linuxNextDaemons</suiteTest>				
+			</suiteTests>
+		</suite>
+	</testSuites>
+
+	<testCases>
+
+		<test>
+			<testName>BuildKernelOnline</testName>
+			<testScript>BuildKernelPatches.sh</testScript>
+			<!-- Put all patches in /tools -->
+			<files>remote-scripts/ica/BuildKernelPatches.sh,tools/PATCH_NAME</files>			
+			<testParams>
+				<param>SOURCE_TYPE=ONLINE</param>
+				<param>LINUX_KERNEL_LOCATION=https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git</param>  
+				<param>KERNEL_VERSION=linux-next</param>
+				<param>OVERWRITE_DEFAULT_KERNEL=false</param>
+				<!-- Write all patches name -->
+				<param>PATCH=patch.patch</param>
+			</testParams>
+			<uploadFiles>
+				<file>Perf_BuildKernel_make.log</file>
+				<file>Perf_BuildKernel_makemodulesinstall.log</file>
+				<file>Perf_BuildKernel_makeinstall.log</file>
+			</uploadFiles>
+			<timeout>10800</timeout>
+			<OnError>Abort</OnError>
+		</test>
+
+	    <test>
+	      <testName>linuxNextDaemons</testName>
+	      <testScript>LIS_daemons.sh</testScript>
+	      <files>remote-scripts/ica/LIS_daemons.sh</files>
+	      <timeout>3200</timeout>
+	      <testparams></testparams>
+		  <noReboot>True</noReboot>
+	      <onError>Abort</onError>
+	    </test>		
+	</testCases>
+
+	<VMs>        
+		<vm>
+			<hvServer>localhost</hvServer>
+			<vmName>test</vmName>
+			<os>Linux</os>
+			<ipv4></ipv4>
+			<sshKey>rhel5_id_rsa.ppk</sshKey>
+			<suite>Upstream</suite>
+			<hardware>
+				<create>true</create>
+				<numCPUs>8</numCPUs>
+				<memSize>8192</memSize>
+				<disableDiff>true</disableDiff>
+				<nic>VMBus,External,00155D407275</nic>
+				<generation>1</generation>
+			</hardware>
+		</vm>
+	</VMs>
+</config>
